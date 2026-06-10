@@ -5,18 +5,22 @@ import { loadConfig } from '../config/config-loader';
 import { logger } from '../utils/logger';
 import { SecurityResult } from '../types/security-result';
 
+interface MCPServer {
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string;
+  type?: string;
+}
+
 interface MCPConfig {
-  servers?: Array<{
-    command: string;
-    args?: string[];
-    env?: Record<string, string>;
-  }>;
-  mcpServers?: Record<string, any>;
+  servers?: MCPServer[];
+  mcpServers?: Record<string, MCPServer>;
 }
 
 export interface SecurityIssue {
   type: 'high' | 'medium' | 'low';
-  category: 'permissions' | 'config' | 'filesystem';
+  category: 'permissions' | 'config' | 'filesystem' | 'network' | 'injection';
   title: string;
   description: string;
   recommendation: string;
@@ -40,27 +44,51 @@ const STANDARD_CONFIG_PATHS = [
   '.vscode/mcp.json',
   'mcp.json',
   '~/.config/claude/claude_desktop_config.json',
-  '~/.cursor/mcp.json'
+  '~/.cursor/mcp.json',
 ];
+
+// Known dangerous argument patterns
+const DANGEROUS_ARGS = [
+  { pattern: /--allow-all/i, title: 'Allow-All Flag', severity: 'high' as const },
+  { pattern: /--no-sandbox/i, title: 'Sandbox Disabled', severity: 'high' as const },
+  { pattern: /--privileged/i, title: 'Privileged Mode', severity: 'high' as const },
+  { pattern: /eval/i, title: 'Code Evaluation', severity: 'high' as const },
+  { pattern: /exec/i, title: 'Code Execution', severity: 'medium' as const },
+  { pattern: /\$\(/i, title: 'Command Substitution', severity: 'high' as const },
+  { pattern: /\|\|/i, title: 'Shell Pipe Chain', severity: 'medium' as const },
+  { pattern: /&&/i, title: 'Shell Command Chain', severity: 'medium' as const },
+  { pattern: /\.\.\/\.\.\//i, title: 'Path Traversal', severity: 'high' as const },
+];
+
+// Known safe MCP server packages
+const KNOWN_SAFE_PACKAGES = new Set([
+  '@modelcontextprotocol/server-filesystem',
+  '@modelcontextprotocol/server-github',
+  '@modelcontextprotocol/server-postgres',
+  '@modelcontextprotocol/server-brave-search',
+  '@modelcontextprotocol/server-puppeteer',
+  '@modelcontextprotocol/server-memory',
+  '@modelcontextprotocol/server-fetch',
+]);
 
 export async function scanConfig(config: any, verbose = false): Promise<SecurityResult> {
   logger.info('Starting MCP configuration scan...');
-  
+
   const result: ConfigScanResult = {
     configFiles: [],
     issues: [],
     permissions: {
       fileAccess: [],
       networkAccess: false,
-      environmentVariables: {}
+      environmentVariables: {},
     },
-    score: 100
+    score: 100,
   };
 
   // Find and analyze MCP config files
   for (const configPath of STANDARD_CONFIG_PATHS) {
     const fullPath = expandPath(configPath);
-    
+
     if (fs.existsSync(fullPath)) {
       result.configFiles.push(fullPath);
       await analyzeConfigFile(fullPath, result);
@@ -78,10 +106,10 @@ export async function scanConfig(config: any, verbose = false): Promise<Security
     score: result.score,
     summary: {
       configFilesFound: result.configFiles.length,
-      highRiskIssues: result.issues.filter(i => i.type === 'high').length,
-      mediumRiskIssues: result.issues.filter(i => i.type === 'medium').length,
-      lowRiskIssues: result.issues.filter(i => i.type === 'low').length
-    }
+      highRiskIssues: result.issues.filter((i) => i.type === 'high').length,
+      mediumRiskIssues: result.issues.filter((i) => i.type === 'medium').length,
+      lowRiskIssues: result.issues.filter((i) => i.type === 'low').length,
+    },
   };
 
   if (verbose) {
@@ -106,7 +134,6 @@ async function analyzeConfigFile(configPath: string, result: ConfigScanResult): 
     }
 
     analyzeServers(config, result, configPath);
-
   } catch (error) {
     logger.error(`Error analyzing config file ${configPath}:`, error);
     result.issues.push({
@@ -115,93 +142,188 @@ async function analyzeConfigFile(configPath: string, result: ConfigScanResult): 
       title: 'Invalid Configuration',
       description: `Could not parse MCP configuration file: ${configPath}`,
       recommendation: 'Check file syntax and ensure it contains valid JSON/YAML',
-      evidence: error instanceof Error ? error.message : String(error)
+      evidence: error instanceof Error ? error.message : String(error),
     });
   }
 }
 
 function analyzeServers(config: MCPConfig, result: ConfigScanResult, configPath: string): void {
-  // Handle different config formats
   const servers = config.servers || config.mcpServers || [];
 
   if (!Array.isArray(servers) && typeof servers === 'object') {
-    Object.values(servers).forEach((server: any) => {
-      analyzeServer(server, result, configPath);
+    Object.entries(servers).forEach(([name, server]) => {
+      analyzeServer(server, result, configPath, name);
     });
   } else if (Array.isArray(servers)) {
-    servers.forEach((server) => {
-      analyzeServer(server, result, configPath);
+    servers.forEach((server, i) => {
+      analyzeServer(server, result, configPath, `server-${i}`);
     });
   }
 }
 
-function analyzeServer(server: any, result: ConfigScanResult, configPath: string): void {
+function analyzeServer(server: MCPServer, result: ConfigScanResult, configPath: string, name: string): void {
   const command = server.command || '';
   const args = server.args || [];
+  const fullCommand = `${command} ${args.join(' ')}`;
 
-  // Check for potentially dangerous commands
-  if (command.includes('python') || command.includes('node') || command.includes('bash') || command.includes('sh')) {
+  // Check if this is a known safe package
+  const isKnownSafe = KNOWN_SAFE_PACKAGES.has(command) || args.some((a) => KNOWN_SAFE_PACKAGES.has(a));
+
+  // === Runtime Interpreter Detection ===
+  if (command.includes('npx') || command.includes('node')) {
+    result.issues.push({
+      type: isKnownSafe ? 'low' : 'high',
+      category: 'permissions',
+      title: isKnownSafe ? 'Standard Node.js MCP Server' : 'Unverified Node.js Server',
+      description: isKnownSafe
+        ? `Server "${name}" uses a known official MCP package: ${command}`
+        : `Server "${name}" runs via ${command} — any npm package can execute arbitrary code`,
+      recommendation: isKnownSafe
+        ? 'This is a known safe package, but still review the version'
+        : 'Verify the package source, check npm page, review recent versions for supply-chain attacks',
+      evidence: `Command: ${command}, Args: ${JSON.stringify(args)}`,
+    });
+    result.score -= isKnownSafe ? 2 : 20;
+  }
+
+  if (command.includes('python') || command.includes('uvx') || command.includes('pip')) {
+    result.issues.push({
+      type: isKnownSafe ? 'low' : 'high',
+      category: 'permissions',
+      title: isKnownSafe ? 'Standard Python MCP Server' : 'Unverified Python Server',
+      description: `Server "${name}" runs via ${command} — can execute arbitrary Python code`,
+      recommendation: 'Verify the package is from a trusted source and pin the version',
+      evidence: `Command: ${command}, Args: ${JSON.stringify(args)}`,
+    });
+    result.score -= isKnownSafe ? 2 : 20;
+  }
+
+  if (command.includes('bash') || command.includes('sh') || command.includes('zsh')) {
     result.issues.push({
       type: 'high',
-      category: 'permissions',
-      title: 'Executable Server Command',
-      description: `MCP server uses executable command: ${command}`,
-      recommendation: 'Review server implementation for security vulnerabilities',
-      evidence: `Command: ${command}, Args: ${JSON.stringify(args)}`
+      category: 'injection',
+      title: 'Shell Command Execution',
+      description: `Server "${name}" directly executes shell commands — highest risk for command injection`,
+      recommendation: 'Avoid shell-based MCP servers. If needed, use with strict sandboxing',
+      evidence: `Command: ${command}, Args: ${JSON.stringify(args)}`,
     });
-    result.score -= 20;
+    result.score -= 30;
   }
 
-  // Check for unrestricted file access
-  if (command.includes('fs') || args.some((arg: string) => arg.includes('*') || arg.includes('/'))) {
-    result.issues.push({
-      type: 'medium',
-      category: 'filesystem',
-      title: 'File System Access',
-      description: 'Server requests file system access',
-      recommendation: 'Restrict to specific directories using allowedFileAccess in config',
-      evidence: `Command: ${command}, Args: ${JSON.stringify(args)}`
-    });
-    result.score -= 15;
+  // === Dangerous Argument Patterns ===
+  for (const dangerous of DANGEROUS_ARGS) {
+    if (dangerous.pattern.test(fullCommand)) {
+      result.issues.push({
+        type: dangerous.severity,
+        category: 'injection',
+        title: dangerous.title,
+        description: `Server "${name}" has dangerous argument matching "${dangerous.pattern}"`,
+        recommendation: 'Review if this flag is necessary and what it exposes',
+        evidence: `Full command: ${fullCommand}`,
+      });
+      result.score -= dangerous.severity === 'high' ? 25 : 15;
+    }
   }
 
-  // Check environment variables
+  // === Environment Variable Secrets ===
   if (server.env && Object.keys(server.env).length > 0) {
-    Object.entries(server.env).forEach(([key, value]) => {
-      result.permissions.environmentVariables[key] = value as string;
-      
-      if (key.includes('SECRET') || key.includes('KEY') || key.includes('PASSWORD')) {
+    for (const [key, value] of Object.entries(server.env)) {
+      result.permissions.environmentVariables[key] = value;
+
+      const sensitivePatterns = ['SECRET', 'KEY', 'PASSWORD', 'TOKEN', 'API_KEY', 'PRIVATE', 'CREDENTIAL'];
+      if (sensitivePatterns.some((p) => key.toUpperCase().includes(p))) {
+        const isPlaintext = typeof value === 'string' && value.length > 0 && !value.startsWith('$(');
         result.issues.push({
-          type: 'high',
+          type: isPlaintext ? 'high' : 'medium',
           category: 'config',
-          title: 'Environment Variable with Sensitive Data',
-          description: `Environment variable ${key} may contain sensitive data`,
-          recommendation: 'Use secure secrets management instead of environment variables',
-          evidence: `Variable: ${key}, Value: ${value}`
+          title: isPlaintext ? 'Plaintext Secret in Config' : 'Secret Reference in Config',
+          description: isPlaintext
+            ? `Server "${name}" has a plaintext secret in ${key} — this file may be readable by other processes`
+            : `Server "${name}" references a secret via ${key}`,
+          recommendation: isPlaintext
+            ? 'Use system keychain, vault, or at minimum ensure config file has restricted permissions (chmod 600)'
+            : 'Good practice referencing secrets, ensure the resolver is secure',
+          evidence: `Variable: ${key}=${isPlaintext ? '[REDACTED]' : value}`,
         });
-        result.score -= 25;
+        result.score -= isPlaintext ? 25 : 5;
       }
-    });
+    }
   }
 
-  // Check for network access
-  if (command.includes('http') || command.includes('curl') || command.includes('wget')) {
+  // === Filesystem Access Patterns ===
+  const fsPatterns = ['/home', '/etc', '/var', '/root', '/Users', '~/', '/tmp'];
+  const rootPatterns = ['/', '*', '.'];
+  const hasFsArgs = args.some((arg) => {
+    const argStr = String(arg);
+    if (fsPatterns.some((p) => argStr.includes(p))) return true;
+    if (argStr === '/' || argStr === '*') return true;
+    if (argStr.includes('/*')) return true;
+    return false;
+  });
+
+  if (hasFsArgs) {
+    const isRoot = args.some((arg) => arg === '/' || arg === '*' || arg.includes('/*'));
+    result.issues.push({
+      type: isRoot ? 'high' : 'medium',
+      category: 'filesystem',
+      title: isRoot ? 'Root Filesystem Access' : 'Broad Filesystem Access',
+      description: isRoot
+        ? `Server "${name}" has access to the entire filesystem — any file can be read/written`
+        : `Server "${name}" has filesystem access that may include sensitive directories`,
+      recommendation: isRoot
+        ? 'Restrict to specific project directories only'
+        : 'Review if all directories are necessary',
+      evidence: `Args: ${args.join(', ')}`,
+    });
+    result.score -= isRoot ? 25 : 10;
+  }
+
+  // === Network/URL-based Servers ===
+  if (server.url) {
+    result.permissions.networkAccess = true;
+    const isLocalhost = server.url.includes('localhost') || server.url.includes('127.0.0.1');
+    const isHttps = server.url.startsWith('https://');
+
+    if (!isLocalhost && !isHttps) {
+      result.issues.push({
+        type: 'high',
+        category: 'network',
+        title: 'Insecure Remote Server',
+        description: `Server "${name}" connects to a remote server over plain HTTP`,
+        recommendation: 'Use HTTPS to prevent MITM attacks on MCP communication',
+        evidence: `URL: ${server.url}`,
+      });
+      result.score -= 20;
+    } else if (!isLocalhost) {
+      result.issues.push({
+        type: 'low',
+        category: 'network',
+        title: 'Remote MCP Server',
+        description: `Server "${name}" connects to a remote server — your prompts and tool results travel over the network`,
+        recommendation: 'Ensure you trust the remote server operator',
+        evidence: `URL: ${server.url}`,
+      });
+      result.score -= 3;
+    }
+  }
+
+  // === Network Access via Command ===
+  if (command.includes('http') || command.includes('curl') || command.includes('wget') || command.includes('fetch')) {
     result.permissions.networkAccess = true;
     result.issues.push({
       type: 'medium',
-      category: 'permissions',
+      category: 'network',
       title: 'Network Access',
-      description: 'Server has network capabilities',
+      description: `Server "${name}" has network capabilities via ${command}`,
       recommendation: 'Ensure server origin is trusted and network usage is justified',
-      evidence: `Command: ${command}`
+      evidence: `Command: ${command}`,
     });
     result.score -= 10;
   }
 }
 
 function calculateSecurityScore(result: ConfigScanResult): void {
-  // Ensure score doesn't go below 0
-  result.score = Math.max(0, result.score);
+  result.score = Math.max(0, Math.min(100, result.score));
 }
 
 function expandPath(p: string): string {
@@ -210,4 +332,3 @@ function expandPath(p: string): string {
   }
   return p;
 }
-
