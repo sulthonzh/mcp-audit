@@ -6,7 +6,7 @@ import { SecurityResult, SecurityIssue } from '../types/security-result';
 import { logger } from '../utils/logger';
 
 export interface ReportOptions {
-  format: 'json' | 'table' | 'summary';
+  format: 'json' | 'table' | 'summary' | 'sarif';
   output?: string;
 }
 
@@ -28,16 +28,21 @@ export async function generateReport(result: SecurityResult, outputPath?: string
     case 'summary':
       await generateSummaryReport(result, options.output);
       break;
+    case 'sarif':
+      await generateSarifReport(result, options.output);
+      break;
   }
 }
 
-function determineFormat(outputPath?: string): 'json' | 'table' | 'summary' {
+function determineFormat(outputPath?: string): 'json' | 'table' | 'summary' | 'sarif' {
   if (!outputPath) return 'table'; // Default to table for console output
   
   const ext = path.extname(outputPath).toLowerCase();
   switch (ext) {
     case '.json':
       return 'json';
+    case '.sarif':
+      return 'sarif';
     case '.txt':
     case '.md':
       return 'summary';
@@ -219,6 +224,9 @@ function createSummaryReport(result: SecurityResult): string {
 
   return output;
 }
+
+// Import SARIF reporter
+import { generateSarifReport } from '../reporters/sarif-reporter';
 
 function generateRecommendations(result: SecurityResult): string[] {
   const recommendations: string[] = [];
