@@ -8,6 +8,7 @@ import { logger } from './utils/logger';
 import { loadConfig, initializeConfig } from './config/config-loader';
 import { scanDocker } from './scanners/docker-scanner';
 import { scanK8s } from './scanners/k8s-scanner';
+import { scanHelm } from './scanners/helm-scanner';
 
 program
   .name('mcp-audit')
@@ -115,6 +116,35 @@ program
       process.exit(fail ? 1 : 0);
     } catch (error) {
       logger.error('❌ K8s scan failed:', error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('helm')
+  .description('Scan Helm charts for security misconfigurations')
+  .argument('<path>', 'Helm chart directory or parent directory')
+  .option('-v, --verbose', 'Verbose output')
+  .option('-o, --output <file>', 'Output file for report')
+  .option('--strict', 'Treat all issues as failures (exit 1)')
+  .option('--ci', 'CI mode (no color, exit codes only)')
+  .action(async (targetPath, options) => {
+    try {
+      if (!options.ci) logger.info(`Scanning Helm charts in: ${targetPath}`);
+      const results = await scanHelm(targetPath, { strict: options.strict });
+      await generateReport(results, options.output);
+
+      if (!options.ci) {
+        const score = results.score ?? 'N/A';
+        const issueCount = results.issues.length;
+        logger.info(`✅ Helm scan completed — ${issueCount} issue(s) found, score: ${score}`);
+      }
+
+      const hasHigh = results.issues.some((i: any) => i.type === 'high');
+      const fail = options.strict ? results.issues.length > 0 : hasHigh;
+      process.exit(fail ? 1 : 0);
+    } catch (error) {
+      logger.error('❌ Helm scan failed:', error);
       process.exit(1);
     }
   });
