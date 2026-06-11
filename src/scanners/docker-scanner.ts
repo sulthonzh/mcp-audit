@@ -275,7 +275,7 @@ function checkComposeFile(content: string, filePath: string): SecurityIssue[] {
     // bind mount to sensitive host paths
     const volumes: string[] = s.volumes || [];
     volumes.forEach(v => {
-      const bindPath = typeof v === 'string' ? v.split(':')[0] : v?.source;
+      const bindPath = typeof v === 'string' ? v.split(':')[0] : (v as any)?.source;
       if (typeof bindPath === 'string') {
         const sensitivePaths = ['/var/run/docker.sock', '/', '/etc', '/root', '/home', '/var'];
         const risky = sensitivePaths.find(p => bindPath === p || bindPath === '/var/run/docker.sock');
