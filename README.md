@@ -1,68 +1,100 @@
 # MCP Audit 🔍
 
-Security scanner for MCP (Model Context Protocol) servers. The `npm audit` equivalent for your AI agent integrations.
+Security scanner for MCP (Model Context Protocol) servers — and your container/K8s/Helm infrastructure too. Think of it as `npm audit` but for your AI agent integrations and cloud-native deployments.
 
 ## Why MCP Audit?
 
-Everyone's installing MCP servers like crazy, but there's no security scanner to check if you're about to give a plugin full access to your filesystem, data, and context. MCP Audit gives you visibility into what these servers can do and potential security risks.
+Everyone's installing MCP servers like crazy, but nobody's checking if they're about to give a plugin full access to their filesystem, data, and context. MCP Audit gives you visibility into what these servers can actually do — and flags the risky stuff before it bites you.
 
-## Features
+It also scans Dockerfiles, Kubernetes manifests, and Helm charts, because your AI tools don't live in a vacuum. They run in containers, on clusters, behind charts. Might as well audit the whole stack.
 
-- **Config Scanner**: Analyzes your MCP configuration files for risky permissions
-- **Static Code Analysis**: Detects common vulnerabilities in MCP server code
-- **Trust Scoring**: Checks GitHub repositories for security signals (tests, CI, stars, known issues)
-- **Vulnerability Database**: Community-maintained list of known-vulnerable MCP servers
-- **CI Integration**: Add `mcp-audit check` to your deployment pipeline
+## What It Scans
+
+| Target | Command | What It Catches |
+|--------|---------|-----------------|
+| MCP config files | `mcp-audit scan` | Risky permissions, overly broad file access |
+| MCP server repos | `mcp-audit check <repo>` | Prompt injection, hardcoded secrets, trust scoring |
+| Dockerfiles | `mcp-audit docker <path>` | Root user, exposed secrets, outdated base images |
+| Kubernetes manifests | `mcp-audit k8s <path>` | Privileged containers, hostNetwork, runaway resources |
+| Helm charts | `mcp-audit helm <path>` | Hardcoded secrets in values.yaml, unsafe defaults |
 
 ## Quick Start
 
 ```bash
 npm install -g mcp-audit
 
-# Scan your current MCP configuration
+# Scan your MCP config
 mcp-audit scan
 
-# Check a specific MCP server
+# Audit a remote MCP server
 mcp-audit check github.com/user/mcp-server
 
-# Run in CI mode
+# Scan a Dockerfile
+mcp-audit docker ./Dockerfile
+
+# Scan K8s manifests
+mcp-audit k8s ./manifests
+
+# Scan a Helm chart
+mcp-audit helm ./my-chart
+
+# CI mode (exits with code on findings)
 mcp-audit check --ci
-```
-
-## Installation
-
-```bash
-npm install mcp-audit
 ```
 
 ## Usage
 
-### Scan Local Configuration
+### Scan MCP Configuration
+Checks `claude_desktop_config.json`, `.cursor/mcp.json`, and other MCP config files for risky permissions.
+
 ```bash
 mcp-audit scan
-# Scans claude_desktop_config.json, .cursor/mcp.json, and other MCP config files
+mcp-audit scan -o report.json  # save report
 ```
 
-### Check Remote Server
+### Check a Remote Server
+Clones the repo, runs static analysis, and generates a trust score based on GitHub signals.
+
 ```bash
 mcp-audit check https://github.com/username/mcp-server
-# Clones repo, runs security analysis, and generates trust score
+mcp-audit check https://github.com/username/mcp-server --ci  # CI-friendly
 ```
+
+### Docker Security
+```bash
+mcp-audit docker ./Dockerfile
+mcp-audit docker ./docker-dir  # scans all Dockerfiles in directory
+```
+
+Detects: root user, `ADD` vs `COPY`, hardcoded secrets, `latest` tags, missing `.dockerignore`.
+
+### Kubernetes Security
+```bash
+mcp-audit k8s ./manifests
+mcp-audit k8s ./manifests --strict  # stricter checks
+```
+
+Detects: privileged containers, hostNetwork/hostPID, missing resource limits, `alwaysPullPolicy` not set, containers running as root.
+
+### Helm Chart Security
+```bash
+mcp-audit helm ./my-chart
+mcp-audit helm ./my-chart --strict -o report.json
+```
+
+Automatically detects Helm charts (looks for `Chart.yaml`). Scans `values.yaml` for hardcoded secrets and privileged flags, strips Go template syntax from `templates/` and runs K8s security checks, and validates `Chart.yaml` for deprecated API versions and missing metadata.
 
 ### CI Integration
-```bash
-mcp-audit check --ci
-# Silent mode suitable for CI pipelines, exits with appropriate codes
+All scanners support `--ci` for pipeline-friendly output and proper exit codes. Use `--strict` to fail on warnings too.
+
+```yaml
+# GitHub Actions example
+- name: Security Audit
+  run: |
+    npx mcp-audit k8s ./k8s --ci --strict
+    npx mcp-audit docker . --ci
+    npx mcp-audit helm ./charts --ci
 ```
-
-## Security Reports
-
-MCP Audit generates detailed reports showing:
-
-- 🔍 **Permissions Analysis**: What file system access the server requests
-- 🛡️ **Vulnerability Detection**: Prompt injection vectors, hardcoded secrets
-- ⭐ **Trust Score**: GitHub repository health and security signals
-- 📋 **Configuration Review**: MCP config file security analysis
 
 ## Configuration
 
@@ -76,22 +108,13 @@ Create `mcp-audit.config.json` to customize:
     "tests": 0.3,
     "ci": 0.2,
     "age": 0.2
-  },
-  "allowedFileAccess": ["~/documents", "~/projects"],
-  "scanDepth": 2
+  }
 }
 ```
 
-## Integrations
+## Pre-commit Hook
 
-### GitHub Action
 ```yaml
-- name: MCP Security Scan
-  uses: sulthonzh/mcp-audit-action@v1
-```
-
-### Pre-commit Hook
-```bash
 # .pre-commit-config.yaml
 repos:
   - repo: local
@@ -104,11 +127,7 @@ repos:
 
 ## Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-## Security
-
-If you discover a vulnerability, please email security@your-domain.com. All security vulnerabilities will be promptly addressed.
+PRs welcome. Open an issue first if it's a significant change.
 
 ## License
 
