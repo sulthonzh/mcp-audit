@@ -9,6 +9,8 @@ import { loadConfig, initializeConfig } from './config/config-loader';
 import { scanDocker } from './scanners/docker-scanner';
 import { scanK8s } from './scanners/k8s-scanner';
 import { scanHelm } from './scanners/helm-scanner';
+import { autoFixConfig, printFixDiff } from './scanners/config-fixer';
+import chalk from 'chalk';
 
 program
   .name('mcp-audit')
@@ -169,6 +171,47 @@ program
     }
     
     console.log('Use --init to create configuration or --show to view current config');
+  });
+
+program
+  .command('fix')
+  .description('Auto-fix security issues in MCP config files')
+  .option('--dry-run', 'Show what would change without writing (default)', true)
+  .option('--in-place', 'Apply fixes directly to config files')
+  .option('-o, --output <file>', 'Write fixed config to a specific file')
+  .option('-q, --quiet', 'Minimal output')
+  .addHelpText('after', '\nExamples:\n  mcp-audit fix              # Show fixes (dry run)\n  mcp-audit fix --in-place   # Apply fixes to config files\n  mcp-audit fix -o fixed.json # Write fixed config to file')
+  .action(async (options) => {
+    try {
+      logger.info('Running MCP config auto-fix...');
+      const results = await autoFixConfig({
+        dryRun: !options.inPlace,
+        inPlace: options.inPlace,
+        output: options.output,
+        quiet: options.quiet,
+      });
+
+      if (results.length === 0) {
+        logger.info('✅ No fixable issues found — config looks good!');
+        process.exit(0);
+      }
+
+      const totalFixes = results.reduce((sum, r) => sum + r.fixesApplied.length, 0);
+
+      if (!options.quiet) {
+        printFixDiff(results);
+      }
+
+      if (!options.inPlace && !options.output) {
+        console.log(chalk.dim(`\n  Run with --in-place to apply, or -o <file> to save to a new file`));
+      }
+
+      logger.info(`${options.inPlace ? '✅' : '🔍'} ${totalFixes} fix(es) across ${results.length} file(s)`);
+      process.exit(0);
+    } catch (error) {
+      logger.error('❌ Auto-fix failed:', error);
+      process.exit(1);
+    }
   });
 
 program.parse();

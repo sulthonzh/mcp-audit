@@ -7,6 +7,7 @@ export { generateReport } from './reporter/report-generator';
 export { loadConfig, initializeConfig } from './config/config-loader';
 export { logger } from './utils/logger';
 export { scanDocker } from './scanners/docker-scanner';
+export { autoFixConfig, printFixDiff } from './scanners/config-fixer';
 export { SecurityResult, SecurityIssue } from './types/security-result';
 
 // Re-export command for programmatic usage
