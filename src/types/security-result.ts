@@ -1,6 +1,6 @@
 export interface SecurityIssue {
   type: 'high' | 'medium' | 'low';
-  category: 'permissions' | 'config' | 'filesystem' | 'network' | 'injection';
+  category: 'permissions' | 'config' | 'filesystem' | 'network' | 'injection' | 'supply-chain' | 'transport';
   title: string;
   description: string;
   recommendation: string;

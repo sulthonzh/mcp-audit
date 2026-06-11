@@ -20,7 +20,7 @@ interface MCPConfig {
 
 export interface SecurityIssue {
   type: 'high' | 'medium' | 'low';
-  category: 'permissions' | 'config' | 'filesystem' | 'network' | 'injection';
+  category: 'permissions' | 'config' | 'filesystem' | 'network' | 'injection' | 'supply-chain' | 'transport';
   title: string;
   description: string;
   recommendation: string;
@@ -134,6 +134,9 @@ async function analyzeConfigFile(configPath: string, result: ConfigScanResult): 
     }
 
     analyzeServers(config, result, configPath);
+
+    // Check file permissions
+    checkFilePermissions(configPath, result);
   } catch (error) {
     logger.error(`Error analyzing config file ${configPath}:`, error);
     result.issues.push({
@@ -319,6 +322,125 @@ function analyzeServer(server: MCPServer, result: ConfigScanResult, configPath: 
       evidence: `Command: ${command}`,
     });
     result.score -= 10;
+  }
+
+  // === Transport Security ===
+  if (server.type === 'sse' || (server.url && !server.url.includes('localhost') && !server.url.includes('127.0.0.1'))) {
+    if (server.url && !server.url.startsWith('https://')) {
+      result.issues.push({
+        type: 'high',
+        category: 'transport',
+        title: 'Insecure SSE Transport',
+        description: `Server "${name}" uses SSE transport over unencrypted connection — prompts and tool results can be intercepted`,
+        recommendation: 'Use wss:// or https:// for SSE transport to protect MCP messages in transit',
+        evidence: `Transport: ${server.type || 'sse'}, URL: ${server.url}`,
+      });
+      result.score -= 20;
+    }
+    if (server.type === 'sse') {
+      result.issues.push({
+        type: 'medium',
+        category: 'transport',
+        title: 'SSE Transport Without Auth',
+        description: `Server "${name}" uses SSE transport — verify it requires authentication to prevent unauthorized tool invocation`,
+        recommendation: 'Add API key, Bearer token, or mTLS authentication to SSE endpoints',
+        evidence: `URL: ${server.url}`,
+      });
+      result.score -= 10;
+    }
+  }
+
+  // === Supply Chain: Version Pinning ===
+  if (command.includes('npx') || command.includes('uvx') || command.includes('pip')) {
+    const hasVersion = args.some((a) => /@\d|^\d|^v\d/.test(String(a)) || String(a).includes('==') || String(a).includes('>='));
+    if (!hasVersion) {
+      const pkgArg = args.find((a) => !a.startsWith('-'));
+      result.issues.push({
+        type: 'medium',
+        category: 'supply-chain',
+        title: 'Unpinned Package Version',
+        description: `Server "${name}" runs ${pkgArg || 'a package'} without a pinned version — a malicious update could compromise your system`,
+        recommendation: `Pin the version: npx ${pkgArg}@1.2.3 or uvx ${pkgArg}==1.2.3`,
+        evidence: `Command: ${command} ${args.join(' ')}`,
+      });
+      result.score -= 15;
+    }
+  }
+
+  // === Supply Chain: Local/Relative Path Execution ===
+  if (command.startsWith('.') || command.startsWith('/') || args.some((a) => String(a).startsWith('./') || String(a).startsWith('../'))) {
+    result.issues.push({
+      type: 'medium',
+      category: 'supply-chain',
+      title: 'Local Path Execution',
+      description: `Server "${name}" runs from a local path — ensure the code is from a trusted source and hasn't been tampered with`,
+      recommendation: 'Verify the source code integrity of local MCP servers',
+      evidence: `Command: ${command}, Args: ${args.join(' ')}`,
+    });
+    result.score -= 8;
+  }
+
+  // === Prompt Injection Risk: Auto-approve Patterns ===
+  if (args.some((a) => /--auto-?approve|--yes|-y|--no-?confirm/i.test(String(a)))) {
+    result.issues.push({
+      type: 'high',
+      category: 'permissions',
+      title: 'Auto-Approve Enabled',
+      description: `Server "${name}" has auto-approve flags — tool calls execute without user confirmation`,
+      recommendation: 'Remove auto-approve flags and review each tool call manually',
+      evidence: `Full command: ${fullCommand}`,
+    });
+    result.score -= 25;
+  }
+}
+
+function checkFilePermissions(configPath: string, result: ConfigScanResult): void {
+  try {
+    const stat = fs.statSync(configPath);
+    const mode = stat.mode & 0o777;
+    const isWorldReadable = mode & 0o004;
+    const isGroupWritable = mode & 0o020;
+    const isWorldWritable = mode & 0o002;
+
+    if (isWorldWritable) {
+      result.issues.push({
+        type: 'high',
+        category: 'config',
+        title: 'World-Writable Config File',
+        description: `${configPath} is world-writable — any user on this system can modify your MCP configuration`,
+        recommendation: 'Run: chmod 600 <config-file> to restrict access',
+        evidence: `File mode: ${mode.toString(8)}`,
+      });
+      result.score -= 20;
+    } else if (isGroupWritable) {
+      result.issues.push({
+        type: 'medium',
+        category: 'config',
+        title: 'Group-Writable Config File',
+        description: `${configPath} is group-writable — group members can modify your MCP configuration`,
+        recommendation: 'Run: chmod 600 <config-file> for stricter access',
+        evidence: `File mode: ${mode.toString(8)}`,
+      });
+      result.score -= 10;
+    }
+
+    if (isWorldReadable) {
+      // Only flag if config contains secrets
+      const hasSecrets = result.issues.some((i) => i.title.includes('Plaintext Secret'));
+      if (hasSecrets) {
+        result.issues.push({
+          type: 'medium',
+          category: 'config',
+          title: 'World-Readable Config With Secrets',
+          description: `${configPath} is world-readable and contains secrets — other users can read your API keys`,
+          recommendation: 'Run: chmod 600 <config-file>',
+          evidence: `File mode: ${mode.toString(8)}`,
+        });
+        result.score -= 15;
+      }
+    }
+  } catch {
+    // Permission check is best-effort, skip on error
   }
 }
 
