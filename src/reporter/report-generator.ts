@@ -1,7 +1,6 @@
 import fs from 'fs-extra';
 import path from 'path';
 import chalk from 'chalk';
-import ora from 'ora';
 import { SecurityResult, SecurityIssue } from '../types/security-result';
 import { logger } from '../utils/logger';
 
@@ -57,7 +56,7 @@ async function generateJsonReport(result: SecurityResult, outputPath?: string): 
       scannedAt: result.timestamp,
       scanType: result.scanType,
       target: result.target,
-      toolVersion: '1.0.0'
+      toolVersion: '1.2.0'
     },
     score: result.score,
     summary: result.summary,

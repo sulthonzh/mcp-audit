@@ -2,7 +2,6 @@ import { Octokit } from '@octokit/rest';
 import simpleGit from 'simple-git';
 import fs from 'fs-extra';
 import path from 'path';
-import axios from 'axios';
 import { loadConfig } from '../config/config-loader';
 import { logger } from '../utils/logger';
 import { SecurityResult, SecurityIssue } from '../types/security-result';

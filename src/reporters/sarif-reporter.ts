@@ -12,7 +12,7 @@ import { SecurityResult, SecurityIssue } from '../types/security-result';
 import { logger } from '../utils/logger';
 
 const TOOL_NAME = 'mcp-audit';
-const TOOL_VERSION = '1.0.0';
+const TOOL_VERSION = '1.2.0';
 const TOOL_INFO_URI = 'https://github.com/sulthonzh/mcp-audit';
 
 interface SarifRule {

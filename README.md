@@ -125,6 +125,58 @@ repos:
         language: system
 ```
 
+## How It Compares
+
+| Tool | Scope | MCP Config | Docker/K8s/Helm | SARIF Output | CLI |
+|------|-------|-----------|-----------------|-------------|-----|
+| **mcp-audit** | MCP servers + infra | ✅ | ✅ | ✅ | ✅ |
+| `npm audit` | npm deps only | ❌ | ❌ | ❌ | ✅ |
+| Trivy | Containers | ❌ | ✅ | ✅ | ✅ |
+| kube-bench | K8s CIS bench | ❌ | ✅ (K8s) | ✅ | ✅ |
+| checkov | IaC policies | ❌ | ✅ | ✅ | ✅ |
+
+**Why mcp-audit?** No other tool scans MCP config files for risky permissions. You'd need Trivy + kube-bench + a custom script to cover what mcp-audit does in one command.
+
+## Real-World Examples
+
+### 1. Pre-commit MCP Safety Check
+
+Before committing changes that add or modify MCP servers, run a quick audit:
+
+```bash
+# In your project root
+mcp-audit scan --ci && echo "✅ MCP config is safe" || echo "❌ Fix issues before committing"
+```
+
+### 2. CI Pipeline Gate (GitHub Actions)
+
+```yaml
+# .github/workflows/mcp-audit.yml
+name: MCP Security Audit
+on: [pull_request]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install -g @sulthonzh/mcp-audit
+      - run: mcp-audit scan --ci -o sarif-report.json
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: sarif-report.json
+```
+
+### 3. Full Stack Security Scan (MCP + Docker + K8s)
+
+```bash
+# Scan everything before deployment
+mcp-audit scan                    # MCP config files
+mcp-audit docker ./Dockerfile     # Container security
+mcp-audit k8s ./manifests         # K8s manifest security
+mcp-audit helm ./charts           # Helm chart security
+mcp-audit check github.com/user/mcp-server  # Remote repo audit
+```
+
 ## Contributing
 
 PRs welcome. Open an issue first if it's a significant change.

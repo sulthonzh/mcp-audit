@@ -59,7 +59,7 @@ describe('SARIF Reporter', () => {
     const driver = sarif.runs[0].tool.driver;
 
     assert.equal(driver.name, 'mcp-audit');
-    assert.equal(driver.version, '1.0.0');
+    assert.equal(driver.version, '1.2.0');
     assert.ok(driver.informationUri);
   });
 

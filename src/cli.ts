@@ -15,7 +15,7 @@ import chalk from 'chalk';
 program
   .name('mcp-audit')
   .description('Security scanner for MCP (Model Context Protocol) servers')
-  .version('1.0.0');
+  .version('1.2.0');
 
 program
   .command('scan')
