@@ -1,7 +1,6 @@
 import fs from 'fs-extra';
 import path from 'path';
 import yaml from 'js-yaml';
-import { loadConfig } from '../config/config-loader';
 import { logger } from '../utils/logger';
 import { SecurityResult } from '../types/security-result';
 
@@ -71,7 +70,7 @@ const KNOWN_SAFE_PACKAGES = new Set([
   '@modelcontextprotocol/server-fetch',
 ]);
 
-export async function scanConfig(config: any, verbose = false): Promise<SecurityResult> {
+export async function scanConfig(config: unknown, verbose = false): Promise<SecurityResult> {
   logger.info('Starting MCP configuration scan...');
 
   const result: ConfigScanResult = {
@@ -255,7 +254,6 @@ function analyzeServer(server: MCPServer, result: ConfigScanResult, configPath: 
 
   // === Filesystem Access Patterns ===
   const fsPatterns = ['/home', '/etc', '/var', '/root', '/Users', '~/', '/tmp'];
-  const rootPatterns = ['/', '*', '.'];
   const hasFsArgs = args.some((arg) => {
     const argStr = String(arg);
     if (fsPatterns.some((p) => argStr.includes(p))) return true;

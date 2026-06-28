@@ -20,7 +20,9 @@
     "dev": "ts-node src/cli.ts",
     "start": "node dist/cli.js",
     "test": "node --import tsx --test test/*.test.ts",
+    "test:coverage": "c8 node --import tsx --test test/*.test.ts",
     "test:watch": "node --import tsx --test --watch test/*.test.ts",
+    "lint": "eslint src/",
     "prepublishOnly": "npm run build && npm test",
     "prepare": "npm run build"
   },
@@ -45,12 +47,17 @@
     "simple-git": "^3.20.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/fs-extra": "^11.0.4",
     "@types/js-yaml": "^4.0.6",
     "@types/node": "^20.0.0",
+    "c8": "^11.0.0",
+    "eslint": "^10.6.0",
+    "globals": "^17.7.0",
     "ts-node": "^10.9.0",
     "tsx": "^4.22.4",
-    "typescript": "^5.2.0"
+    "typescript": "^5.2.0",
+    "typescript-eslint": "^8.62.0"
   },
   "files": [
     "dist/**/*",

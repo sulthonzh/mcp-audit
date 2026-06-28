@@ -14,7 +14,7 @@ export class Logger {
     this.options = options;
   }
 
-  private log(level: LogLevel, message: string, data?: any): void {
+  private log(level: LogLevel, message: string, data?: unknown): void {
     if (this.options.silent) return;
     
     const timestamp = new Date().toISOString();
@@ -49,24 +49,24 @@ export class Logger {
         break;
     }
 
-    if (data && this.options.verbose) {
+    if (data !== undefined && data !== null && this.options.verbose) {
       console.log(chalk.gray(JSON.stringify(data, null, 2)));
     }
   }
 
-  info(message: string, data?: any): void {
+  info(message: string, data?: unknown): void {
     this.log('info', message, data);
   }
 
-  warn(message: string, data?: any): void {
+  warn(message: string, data?: unknown): void {
     this.log('warn', message, data);
   }
 
-  error(message: string, data?: any): void {
+  error(message: string, data?: unknown): void {
     this.log('error', message, data);
   }
 
-  debug(message: string, data?: any): void {
+  debug(message: string, data?: unknown): void {
     this.log('debug', message, data);
   }
 

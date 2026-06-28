@@ -241,7 +241,6 @@ function generateRecommendations(result: SecurityResult): string[] {
 
   // Specific recommendations based on issues
   const highRiskIssues = result.issues.filter(issue => issue.type === 'high');
-  const mediumRiskIssues = result.issues.filter(issue => issue.type === 'medium');
   const configIssues = result.issues.filter(issue => issue.category === 'config');
   const permissionIssues = result.issues.filter(issue => issue.category === 'permissions');
 

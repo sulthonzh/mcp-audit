@@ -21,7 +21,7 @@ export interface SecurityResult {
   issues: SecurityIssue[];
   score: number;
   summary: ScanSummary;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface VulnerabilityDatabaseEntry {

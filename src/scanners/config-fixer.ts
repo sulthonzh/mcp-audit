@@ -18,7 +18,6 @@ import path from 'path';
 import yaml from 'js-yaml';
 import chalk from 'chalk';
 import { logger } from '../utils/logger';
-import { SecurityResult } from '../types/security-result';
 
 export interface FixOptions {
   dryRun?: boolean;     // Default: true — show what would change without writing
@@ -140,7 +139,7 @@ async function fixConfigFile(filePath: string, options: FixOptions = {}): Promis
     // Fix 1: Remove dangerous flags from args
     if (server.args && Array.isArray(server.args)) {
       const cleanedArgs: string[] = [];
-      let removedFlags: string[] = [];
+      const removedFlags: string[] = [];
 
       for (const arg of server.args) {
         const isDangerous = DANGEROUS_FLAGS.some(pattern => pattern.test(arg));

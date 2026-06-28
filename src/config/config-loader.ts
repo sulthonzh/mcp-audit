@@ -53,7 +53,7 @@ export function loadConfig(configPath?: string): MCPAuditConfig {
     try {
       const userConfig = fs.readJsonSync(configFile);
       return { ...DEFAULT_CONFIG, ...userConfig };
-    } catch (error) {
+    } catch {
       console.warn(`Warning: Could not parse config file ${configFile}, using defaults`);
       return DEFAULT_CONFIG;
     }
@@ -65,7 +65,7 @@ export function loadConfig(configPath?: string): MCPAuditConfig {
     try {
       const globalConfig = fs.readJsonSync(globalConfigFile);
       return { ...DEFAULT_CONFIG, ...globalConfig };
-    } catch (error) {
+    } catch {
       console.warn(`Warning: Could not parse global config file ${globalConfigFile}, using defaults`);
     }
   }

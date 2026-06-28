@@ -84,7 +84,7 @@ program
         logger.info(`✅ Docker scan completed — ${issueCount} issue(s) found, score: ${score}`);
       }
 
-      const hasHigh = results.issues.some((i: any) => i.severity === 'high');
+      const hasHigh = results.issues.some((i) => i.type === 'high');
       const fail = options.strict ? results.issues.length > 0 : hasHigh;
       process.exit(fail ? 1 : 0);
     } catch (error) {
@@ -113,7 +113,7 @@ program
         logger.info(`✅ K8s scan completed — ${issueCount} issue(s) found, score: ${score}`);
       }
 
-      const hasHigh = results.issues.some((i: any) => i.type === 'high');
+      const hasHigh = results.issues.some((i) => i.type === 'high');
       const fail = options.strict ? results.issues.length > 0 : hasHigh;
       process.exit(fail ? 1 : 0);
     } catch (error) {
@@ -142,7 +142,7 @@ program
         logger.info(`✅ Helm scan completed — ${issueCount} issue(s) found, score: ${score}`);
       }
 
-      const hasHigh = results.issues.some((i: any) => i.type === 'high');
+      const hasHigh = results.issues.some((i) => i.type === 'high');
       const fail = options.strict ? results.issues.length > 0 : hasHigh;
       process.exit(fail ? 1 : 0);
     } catch (error) {

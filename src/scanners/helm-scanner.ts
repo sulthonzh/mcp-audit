@@ -20,29 +20,6 @@ interface HelmScanOptions {
 
 // ---- Go template stripping ----
 
-const TEMPLATE_PATTERNS = [
-  /\{\{-?\s*\/\*[\s\S]*?\*\/\s*-?\}\}/g,        // {{/* comment */}}
-  /\{\{-?\s*if\s+[\s\S]*?-?\}\}/g,                // {{ if ... }}
-  /\{\{-?\s*else\s*-?\}\}/g,                       // {{ else }}
-  /\{\{-?\s*end\s*-?\}\}/g,                        // {{ end }}
-  /\{\{-?\s*range\s+[\s\S]*?-?\}\}/g,              // {{ range ... }}
-  /\{\{-?\s*with\s+[\s\S]*?-?\}\}/g,               // {{ with ... }}
-  /\{\{-?\s*block\s+[\s\S]*?-?\}\}/g,              // {{ block ... }}
-  /\{\{-?\s*define\s+[\s\S]*?-?\}\}/g,             // {{ define ... }}
-  /\{\{-?\s*tpl\s+[\s\S]*?-?\}\}/g,                // {{ tpl ... }}
-  /\{\{-?\s*include\s+[\s\S]*?-?\}\}/g,            // {{ include ... }}
-  /\{\{-?\s*toYaml\s+[\s\S]*?-?\}\}/g,             // {{ toYaml ... }}
-  /\{\{-?\s*toJson\s+[\s\S]*?-?\}\}/g,             // {{ toJson ... }}
-  /\{\{-?\s*\.[\w.]+\s*\|?\s*[\w\s]*-?\}\}/g,     // {{ .Values.xxx }}
-  /\{\{-?\s*\$[\w.]+\s*-?\}\}/g,                   // {{ $var }}
-  /\{\{-?\s*default\s+[\s\S]*?-?\}\}/g,            // {{ default ... }}
-  /\{\{-?\s*printf\s+[\s\S]*?-?\}\}/g,             // {{ printf ... }}
-  /\{\{-?\s*required\s+[\s\S]*?-?\}\}/g,           // {{ required ... }}
-  /\{\{-?\s*lookup\s+[\s\S]*?-?\}\}/g,             // {{ lookup ... }}
-  /\{\{-?\s*\w+\s+[\s\S]*?-?\}\}/g,                // {{ function args }}
-  /\{\{-?\s*[\s\S]*?-?\}\}/g,                       // catch-all remaining
-];
-
 function stripGoTemplate(content: string): string {
   let cleaned = content;
   // Remove comments first
@@ -54,11 +31,15 @@ function stripGoTemplate(content: string): string {
 
 // ---- values.yaml checks ----
 
-function checkValues(values: any, relPath: string): SecurityIssue[] {
+interface HelmValues {
+  [key: string]: unknown;
+}
+
+function checkValues(values: HelmValues | null, relPath: string): SecurityIssue[] {
   const issues: SecurityIssue[] = [];
   if (!values || typeof values !== 'object') return issues;
 
-  function walk(obj: any, path: string) {
+  function walk(obj: Record<string, unknown>, path: string) {
     if (!obj || typeof obj !== 'object') return;
 
     for (const [key, val] of Object.entries(obj)) {
@@ -126,7 +107,7 @@ function checkValues(values: any, relPath: string): SecurityIssue[] {
 
       // Recurse into nested objects
       if (typeof val === 'object' && val !== null) {
-        walk(val, currentPath);
+        walk(val as Record<string, unknown>, currentPath);
       }
     }
   }
@@ -137,7 +118,7 @@ function checkValues(values: any, relPath: string): SecurityIssue[] {
 
 // ---- Chart.yaml checks ----
 
-function checkChartYaml(chart: any, relPath: string): SecurityIssue[] {
+function checkChartYaml(chart: Record<string, unknown> | null, relPath: string): SecurityIssue[] {
   const issues: SecurityIssue[] = [];
   if (!chart || typeof chart !== 'object') return issues;
 
@@ -159,7 +140,7 @@ function checkChartYaml(chart: any, relPath: string): SecurityIssue[] {
       type: 'medium',
       category: 'config',
       title: 'Deprecated Helm chart',
-      description: `Chart "${chart.name ?? 'unnamed'}" is marked as deprecated`,
+      description: `Chart "${String(chart.name ?? 'unnamed')}" is marked as deprecated`,
       recommendation: 'Migrate to a maintained chart or fork and maintain your own',
       evidence: relPath,
     });
@@ -170,24 +151,41 @@ function checkChartYaml(chart: any, relPath: string): SecurityIssue[] {
 
 // ---- Template scanning (reuse K8s checks) ----
 
-interface K8sManifest {
+interface HelmK8sContainer {
+  name?: string;
+  image?: string;
+  securityContext?: { privileged?: boolean };
+  resources?: { limits?: Record<string, unknown> };
+  env?: Array<{ name?: string; value?: string; valueFrom?: unknown }>;
+}
+
+interface HelmK8sPodSpec {
+  containers?: HelmK8sContainer[];
+  initContainers?: HelmK8sContainer[];
+  volumes?: Array<{ name?: string; hostPath?: { path?: string } }>;
+  hostNetwork?: boolean;
+}
+
+interface HelmK8sManifest {
   apiVersion?: string;
   kind?: string;
   metadata?: { name?: string; namespace?: string };
-  spec?: any;
-  template?: any;
+  spec?: {
+    type?: string;
+    template?: { spec?: HelmK8sPodSpec };
+  } & HelmK8sPodSpec;
 }
 
-function extractPodSpec(manifest: K8sManifest): any | null {
+function extractPodSpec(manifest: HelmK8sManifest): HelmK8sPodSpec | null {
   const kind = manifest.kind?.toLowerCase() ?? '';
-  if (kind === 'pod') return manifest.spec;
+  if (kind === 'pod') return manifest.spec as HelmK8sPodSpec ?? null;
   if (['deployment', 'statefulset', 'daemonset', 'replicaset', 'job'].includes(kind)) {
     return manifest.spec?.template?.spec ?? null;
   }
   return null;
 }
 
-function scanTemplateManifest(doc: any, relPath: string): SecurityIssue[] {
+function scanTemplateManifest(doc: HelmK8sManifest, relPath: string): SecurityIssue[] {
   const issues: SecurityIssue[] = [];
   if (!doc || typeof doc !== 'object' || !doc.kind) return issues;
 
@@ -346,7 +344,7 @@ async function findTemplateFiles(chartDir: string): Promise<string[]> {
 
 // ---- Public API ----
 
-export async function scanHelm(targetPath: string, options: HelmScanOptions = {}): Promise<SecurityResult> {
+export async function scanHelm(targetPath: string, _options: HelmScanOptions = {}): Promise<SecurityResult> {
   const issues: SecurityIssue[] = [];
   let chartsScanned = 0;
   let templatesScanned = 0;
@@ -373,7 +371,7 @@ export async function scanHelm(targetPath: string, options: HelmScanOptions = {}
       const chartFile = path.join(chartDir, 'Chart.yaml');
       if (await fs.pathExists(chartFile)) {
         const chartContent = await fs.readFile(chartFile, 'utf8');
-        const chart = yaml.load(chartContent) as any;
+        const chart = yaml.load(chartContent) as Record<string, unknown> | null;
         issues.push(...checkChartYaml(chart, path.join(chartRel, 'Chart.yaml')));
       }
 
@@ -381,7 +379,7 @@ export async function scanHelm(targetPath: string, options: HelmScanOptions = {}
       const valuesFile = path.join(chartDir, 'values.yaml');
       if (await fs.pathExists(valuesFile)) {
         const valuesContent = await fs.readFile(valuesFile, 'utf8');
-        const values = yaml.load(valuesContent) as any;
+        const values = yaml.load(valuesContent) as HelmValues | null;
         issues.push(...checkValues(values, path.join(chartRel, 'values.yaml')));
       }
 
@@ -393,7 +391,7 @@ export async function scanHelm(targetPath: string, options: HelmScanOptions = {}
         const tfRel = path.relative(targetPath, tf);
 
         try {
-          const docs = yaml.loadAll(cleaned) as any[];
+          const docs = yaml.loadAll(cleaned) as HelmK8sManifest[];
           let hadManifest = false;
           for (const doc of docs) {
             if (!doc || typeof doc !== 'object' || !doc.kind) continue;

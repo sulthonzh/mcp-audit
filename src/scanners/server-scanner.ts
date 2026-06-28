@@ -2,7 +2,6 @@ import { Octokit } from '@octokit/rest';
 import simpleGit from 'simple-git';
 import fs from 'fs-extra';
 import path from 'path';
-import { loadConfig } from '../config/config-loader';
 import { logger } from '../utils/logger';
 import { SecurityResult, SecurityIssue } from '../types/security-result';
 
@@ -179,8 +178,10 @@ async function cloneRepository(repoInfo: RepositoryInfo): Promise<string> {
   }
 }
 
-async function analyzeRepository(clonePath: string, options: ScanOptions): Promise<any> {
-  const analysis = {
+async function analyzeRepository(clonePath: string, _options: ScanOptions): Promise<ServerAnalysis> {
+  const analysis: ServerAnalysis = {
+    stars: 0,
+    ageInDays: 0,
     hasPackageJson: false,
     hasMCPConfig: false,
     hasTests: false,
@@ -386,7 +387,27 @@ function detectLanguage(files: string[]): string {
   return mostCommon ? mostCommon[0] : 'unknown';
 }
 
-function calculateTrustScore(analysis: any, weights: any): number {
+interface ServerAnalysis {
+  stars: number;
+  hasTests: boolean;
+  hasCI: boolean;
+  ageInDays: number;
+  hasPackageJson?: boolean;
+  hasMCPConfig?: boolean;
+  language?: string;
+  dependencies?: number;
+  files?: number;
+  size?: number;
+}
+
+interface TrustWeights {
+  stars: number;
+  tests: number;
+  ci: number;
+  age: number;
+}
+
+function calculateTrustScore(analysis: ServerAnalysis, weights: TrustWeights): number {
   let score = 0;
   
   // Stars weight (normalized, max 1000 stars = full points)

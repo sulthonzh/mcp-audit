@@ -18,24 +18,83 @@ interface K8sScanOptions {
 
 // ---- K8s manifest checks ----
 
+interface K8sSecurityContext {
+  runAsNonRoot?: boolean;
+  privileged?: boolean;
+}
+
+interface K8sResourceRequirements {
+  limits?: Record<string, string>;
+  requests?: Record<string, string>;
+}
+
+interface K8sVolumeMount {
+  name?: string;
+  mountPath?: string;
+}
+
+interface K8sEnvVar {
+  name?: string;
+  value?: string;
+  valueFrom?: unknown;
+}
+
+interface K8sProbe {
+  [key: string]: unknown;
+}
+
+interface K8sContainer {
+  name?: string;
+  image?: string;
+  securityContext?: K8sSecurityContext;
+  resources?: K8sResourceRequirements;
+  volumeMounts?: K8sVolumeMount[];
+  env?: K8sEnvVar[];
+  livenessProbe?: K8sProbe;
+  readinessProbe?: K8sProbe;
+}
+
+interface K8sVolume {
+  name?: string;
+  hostPath?: { path?: string };
+}
+
+interface K8sPodSpec {
+  containers?: K8sContainer[];
+  initContainers?: K8sContainer[];
+  volumes?: K8sVolume[];
+  hostNetwork?: boolean;
+  hostPID?: boolean;
+  hostIPC?: boolean;
+}
+
+interface K8sDeploymentSpec {
+  template?: { spec?: K8sPodSpec };
+}
+
+interface K8sServiceSpec {
+  type?: string;
+}
+
 interface K8sManifest {
   apiVersion?: string;
   kind?: string;
   metadata?: { name?: string; namespace?: string };
-  spec?: any;
-  template?: any; // for Deployment etc.
+  spec?: K8sPodSpec | K8sDeploymentSpec | K8sServiceSpec;
+  template?: { spec?: K8sPodSpec };
 }
 
-function extractPodSpec(manifest: K8sManifest): any | null {
+function extractPodSpec(manifest: K8sManifest): K8sPodSpec | null {
   const kind = manifest.kind?.toLowerCase() ?? '';
-  if (kind === 'pod') return manifest.spec;
+  if (kind === 'pod') return manifest.spec as K8sPodSpec ?? null;
   if (['deployment', 'statefulset', 'daemonset', 'replicaset', 'job'].includes(kind)) {
-    return manifest.spec?.template?.spec ?? null;
+    const spec = manifest.spec as K8sDeploymentSpec | undefined;
+    return spec?.template?.spec ?? null;
   }
   return null;
 }
 
-function checkPodSpec(podSpec: any, relPath: string, manifestName: string): SecurityIssue[] {
+function checkPodSpec(podSpec: K8sPodSpec | null, relPath: string, manifestName: string): SecurityIssue[] {
   const issues: SecurityIssue[] = [];
   if (!podSpec) return issues;
 
@@ -220,7 +279,7 @@ function checkPodSpec(podSpec: any, relPath: string, manifestName: string): Secu
 
 function checkService(manifest: K8sManifest, relPath: string): SecurityIssue[] {
   const issues: SecurityIssue[] = [];
-  const spec = manifest.spec;
+  const spec = manifest.spec as K8sServiceSpec | undefined;
   if (!spec) return issues;
 
   const name = manifest.metadata?.name ?? 'unnamed-service';
@@ -252,7 +311,7 @@ function checkService(manifest: K8sManifest, relPath: string): SecurityIssue[] {
   return issues;
 }
 
-function checkManifest(doc: any, relPath: string): SecurityIssue[] {
+function checkManifest(doc: K8sManifest, relPath: string): SecurityIssue[] {
   const issues: SecurityIssue[] = [];
 
   if (!doc || typeof doc !== 'object' || !doc.kind) return issues;
@@ -305,7 +364,7 @@ async function findYamlFiles(targetPath: string): Promise<string[]> {
 
 // ---- Public API ----
 
-export async function scanK8s(targetPath: string, options: K8sScanOptions = {}): Promise<SecurityResult> {
+export async function scanK8s(targetPath: string, _options: K8sScanOptions = {}): Promise<SecurityResult> {
   const issues: SecurityIssue[] = [];
   let filesScanned = 0;
 
@@ -317,7 +376,7 @@ export async function scanK8s(targetPath: string, options: K8sScanOptions = {}):
       const rel = path.relative(targetPath, fp);
 
       // YAML may contain multiple docs separated by ---
-      const docs = yaml.loadAll(content) as any[];
+      const docs = yaml.loadAll(content) as K8sManifest[];
       let hadK8sManifest = false;
 
       for (const doc of docs) {

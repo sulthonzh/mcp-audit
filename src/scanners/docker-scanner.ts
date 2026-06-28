@@ -17,7 +17,7 @@ interface DockerScanOptions {
 
 // ---- Public API ----
 
-export async function scanDocker(targetPath: string, options: DockerScanOptions = {}): Promise<SecurityResult> {
+export async function scanDocker(targetPath: string, _options: DockerScanOptions = {}): Promise<SecurityResult> {
   const issues: SecurityIssue[] = [];
   let filesScanned = 0;
 
@@ -227,12 +227,24 @@ function checkDockerfile(content: string, filePath: string): SecurityIssue[] {
 
 // ---- Docker Compose Checks ----
 
+interface ComposeService {
+  privileged?: boolean;
+  network_mode?: string;
+  volumes?: Array<string | { source?: string }>;
+  read_only?: boolean;
+  image?: string;
+}
+
+interface ComposeDoc {
+  services?: Record<string, ComposeService>;
+}
+
 function checkComposeFile(content: string, filePath: string): SecurityIssue[] {
   const issues: SecurityIssue[] = [];
 
-  let doc: any;
+  let doc: ComposeDoc | null;
   try {
-    doc = yaml.load(content) as any;
+    doc = yaml.load(content) as ComposeDoc | null;
   } catch {
     issues.push({
       type: 'low',
@@ -246,7 +258,7 @@ function checkComposeFile(content: string, filePath: string): SecurityIssue[] {
 
   const services = doc?.services || {};
   for (const [name, svc] of Object.entries(services)) {
-    const s = svc as any;
+    const s = svc;
 
     // privileged: true
     if (s.privileged === true) {
@@ -273,9 +285,9 @@ function checkComposeFile(content: string, filePath: string): SecurityIssue[] {
     }
 
     // bind mount to sensitive host paths
-    const volumes: string[] = s.volumes || [];
+    const volumes: Array<string | { source?: string }> = s.volumes || [];
     volumes.forEach(v => {
-      const bindPath = typeof v === 'string' ? v.split(':')[0] : (v as any)?.source;
+      const bindPath = typeof v === 'string' ? v.split(':')[0] : v?.source;
       if (typeof bindPath === 'string') {
         const sensitivePaths = ['/var/run/docker.sock', '/', '/etc', '/root', '/home', '/var'];
         const risky = sensitivePaths.find(p => bindPath === p || bindPath === '/var/run/docker.sock');
@@ -293,7 +305,7 @@ function checkComposeFile(content: string, filePath: string): SecurityIssue[] {
     });
 
     // Docker socket mount
-    const hasSocket = volumes.some((v: any) => {
+    const hasSocket = volumes.some((v) => {
       const src = typeof v === 'string' ? v.split(':')[0] : v?.source;
       return src === '/var/run/docker.sock';
     });
