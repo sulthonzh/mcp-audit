@@ -75,5 +75,8 @@
   "bugs": {
     "url": "https://github.com/sulthonzh/mcp-audit/issues"
   },
-  "homepage": "https://github.com/sulthonzh/mcp-audit#readme"
+  "homepage": "https://github.com/sulthonzh/mcp-audit#readme",
+  "publishConfig": {
+    "access": "public"
+  }
 }
