@@ -98,4 +98,9 @@ Thumbs.db
 
 # Temporary files
 temp-clones/
-test-mcp-server/
+test-mcp-server/build/
+__pycache__/
+.venv/
+*.egg-info/
+.mypy_cache/
+.env.*
