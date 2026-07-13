@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
-import { scanDocker } from '../src/scanners/docker-scanner.js';
+import { scanDocker } from '../src/scanners/docker-scanner.ts';
 
 async function makeTempDir(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), 'mcp-docker-test-'));

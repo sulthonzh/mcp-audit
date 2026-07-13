@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
-import { scanK8s } from '../src/scanners/k8s-scanner';
+import { scanK8s } from '../src/scanners/k8s-scanner.ts';
 
 async function makeTempDir(files: Record<string, string>): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'k8s-test-'));

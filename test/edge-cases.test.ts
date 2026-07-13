@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
-import { Logger } from '../src/utils/logger';
-import { loadConfig, getConfigPath, getDefaultConfigPath, initializeConfig, MCPAuditConfig } from '../src/config/config-loader';
+import { Logger } from '../src/utils/logger.ts';
+import { loadConfig, getConfigPath, getDefaultConfigPath, initializeConfig, MCPAuditConfig } from '../src/config/config-loader.ts';
 import { autoFixConfig, printFixDiff, FixOptions } from '../src/scanners/config-fixer';
 
 // ============== LOGGER TESTS ==============

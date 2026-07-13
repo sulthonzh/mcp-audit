@@ -1,8 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { scanConfig } from '../src/scanners/config-scanner';
+import { scanConfig } from '../src/scanners/config-scanner.ts';
 import { SecurityResult } from '../src/types/security-result';
-import { loadConfig } from '../src/config/config-loader';
+import { loadConfig } from '../src/config/config-loader.ts';
 
 describe('MCP Audit Basic Tests', () => {
   it('should scan configuration successfully', async () => {

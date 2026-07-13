@@ -2,7 +2,7 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs-extra';
 import path from 'path';
-import { scanHelm } from '../src/scanners/helm-scanner';
+import { scanHelm } from '../src/scanners/helm-scanner.ts';
 
 const TMP = path.join(__dirname, '__helm_test_tmp__');
 

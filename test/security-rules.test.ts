@@ -1,8 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { scanConfig } from '../src/scanners/config-scanner';
-import { SecurityResult } from '../src/types/security-result';
-import { loadConfig } from '../src/config/config-loader';
+import { scanConfig } from '../src/scanners/config-scanner.ts';
+import { SecurityResult } from '../src/types/security-result.ts';
+import { loadConfig } from '../src/config/config-loader.ts';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
