@@ -110,7 +110,7 @@ function checkDockerfile(content: string, filePath: string): SecurityIssue[] {
 
     // --no-auth or --insecure flags in RUN commands
     if (/^RUN\b/i.test(trimmed)) {
-      if (/\b--no-verify-ssl\b|\b--insecure\b|\b--no-check-certificate\b/i.test(trimmed)) {
+      if (/--no-verify-ssl|--insecure|--no-check-certificate/i.test(trimmed)) {
         issues.push({
           type: 'high',
           category: 'transport',
