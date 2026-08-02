@@ -1,6 +1,6 @@
 # STATUS.md — mcp-audit
 
-## Exceptional Checklist Audit (2026-07-30)
+## Exceptional Checklist Audit (2026-08-02)
 
 | # | Criterion | Status | Evidence |
 |---|-----------|--------|----------|
@@ -36,6 +36,14 @@
 | utils | 100 | 92.5 | 100 | 100 | logger.ts: 1,86 |
 
 ## Notes
+
+### Re-Audit (2026-08-02)
+
+- **Dependency update**: `npm update --save` applied (fs-extra 11.3.5→11.4.0, globals 17.7.0→17.8.0, tsx 4.22.4→4.23.1, typescript-eslint 8.62.0→8.65.0, eslint 10.6.0→10.8.0)
+- **All 241 tests GREEN** post-update
+- **ESLint clean, TSC clean** post-update
+- **Coverage unchanged**: 97.71% stmts, 87.81% branches, 100% funcs
+- Remaining coverage gaps confirmed as V8 artifacts and non-testable filesystem permission edge cases
 
 ### Coverage Gaps (post-2026-07-30 re-audit)
 
@@ -86,6 +94,7 @@ All tests GREEN ✅
 | 2026-07-19 | 225 | +32 | 97.71% | 87.06% | 74377bf |
 | 2026-07-24 | 225 | 0 (audit only) | 97.71% | 87.06% | 85f6af7 |
 | **2026-07-30** | **241** | **+16** | **97.71%** | **87.81%** | **8454aac** |
+| **2026-08-02** | **241** | **0 (deps update)** | **97.71%** | **87.81%** | **(pending)** |
 
 ## Recent Changes (2026-07-30 re-audit)
 
