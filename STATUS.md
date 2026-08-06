@@ -1,6 +1,6 @@
 # STATUS.md — mcp-audit
 
-## Exceptional Checklist Audit (2026-08-05)
+## Exceptional Checklist Audit (2026-08-07)
 
 | # | Criterion | Status | Evidence |
 |---|-----------|--------|----------|
@@ -9,7 +9,7 @@
 | 3 | All tests GREEN (100% pass rate) | ✅ | **241/241** tests pass (35 test suites) |
 | 4 | Test coverage ≥ 80% on core logic | ✅ | **97.71%** stmts, **87.81%** branches, **100%** funcs |
 | 5 | Zero TypeScript errors (strict mode) | ✅ | `tsc --noEmit` clean, no errors |
-| 6 | Zero ESLint warnings | ✅ | ESLint passes with zero warnings |
+| 6 | Zero ESLint warnings | ✅ | ESLint: 0 errors 0 warnings (test overrides for no-explicit-any) |
 | 7 | No TODO/FIXME comments in shipped code | ✅ | Zero TODO/FIXME in src/ |
 | 8 | At least 3 real-world examples in docs | ✅ | README has 4 examples: MCP config scan, Dockerfile scan, K8s manifest scan, Helm chart scan |
 | 9 | CHANGELOG up to date | ✅ | v1.0.0 → v1.2.0 documented |
