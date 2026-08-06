@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
-import { autoFixConfig, printFixDiff } from '../src/scanners/config-fixer';
+import { printFixDiff } from '../src/scanners/config-fixer';
 
 const tmpDir = path.join(os.tmpdir(), 'mcp-audit-fix-test');
 
@@ -29,7 +29,7 @@ describe('config-fixer', () => {
     const filePath = await setupConfig('dangerous-flags', config);
     // We test the fixer logic directly, not via autoFixConfig which scans standard paths
     // Instead, test the fixConfigFile function directly
-    const { fixConfigFile } = await import('../src/scanners/config-fixer');
+    const { fixConfigFile: _fixConfigFile } = await import('../src/scanners/config-fixer');
     // fixConfigFile is not exported, so let's test via the main function
     // Actually let's just validate the logic manually by importing what we can
     

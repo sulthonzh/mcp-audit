@@ -35,7 +35,7 @@ describe('MCP Audit', () => {
   describe('security rule detection', () => {
     const tmpDir = path.join(os.tmpdir(), `mcp-audit-test-${Date.now()}`);
 
-    async function scanConfigFile(content: object): Promise<SecurityResult> {
+    async function _scanConfigFile(content: object): Promise<SecurityResult> {
       await fs.ensureDir(tmpDir);
       const configPath = path.join(tmpDir, 'claude_desktop_config.json');
       await fs.writeJson(configPath, content, { spaces: 2 });

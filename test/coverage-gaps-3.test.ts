@@ -1,4 +1,4 @@
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs-extra';
 import path from 'path';
@@ -530,7 +530,7 @@ describe('config-scanner file permissions', () => {
 
       const result = await scanConfig(configPath);
       // Should find the API key as plaintext secret AND flag world-readable
-      const worldReadable = result.issues.find(i => i.title.includes('World-Readable'));
+      const _worldReadable = result.issues.find(i => i.title.includes('World-Readable'));
       // This branch only fires if there are plaintext secrets detected
       assert.ok(result.issues.length >= 0, 'Should handle permissions check');
     } finally {
