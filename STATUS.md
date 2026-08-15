@@ -1,8 +1,8 @@
 # STATUS.md — mcp-audit
 
 ## Exceptional Checklist Audit (2026-08-08)
-**Re-verified:** 2026-08-11 05:51 UTC — 241/241 tests GREEN ✅ (8.6s), ESLint clean ✅
-**Prior:** 2026-08-08 22:53 UTC — 241/241 tests GREEN ✅ (21.6s), ESLint clean ✅
+**Re-verified:** 2026-08-15 02:40 UTC — 241/241 tests GREEN ✅ (5.7s), clean tree, at remote HEAD (be261a7)
+**Prior:** 2026-08-11 05:51 UTC — 241/241 tests GREEN ✅ (8.6s), ESLint clean ✅
 
 | # | Criterion | Status | Evidence |
 |---|-----------|--------|----------|
